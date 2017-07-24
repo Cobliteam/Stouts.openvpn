@@ -9,6 +9,12 @@
       keep_newer: yes
     when: not openvpn_use_system_easyrsa
 
+  - name: Generate openssl.cfn
+    file:
+      src: "{{ openvpn_etcdir }}/easy-rsa/openssl-1.0.0.cnf"
+      dest: "{{ openvpn_etcdir }}/easy-rsa/openssl.cnf"
+      state: link
+
   - name: Check if easy-rsa 2.x is available from the system
     stat: path=/usr/share/easy-rsa/build-ca
     register: openvpn_easyrsa_check
@@ -99,7 +105,7 @@
   - name: Revoke Clients keys
     shell: >
       [[ -f crl.pem && -f "{{ item }}.crt" ]] || exit 20;
-      openssl verify -CAfile <(cat ca.crt crl.pem) -crl_check "{{ item }}.crt" | grep revoked && exit 20;
+      openssl verify -CAfile <(cat ca.crt crl.pem) -crl_check "{{ item }}.crt" 2>&1 | grep revoked && exit 20;
       . "{{ openvpn_etcdir }}/vars" && "$EASY_RSA/revoke-full" "{{ item }}"
     args:
       executable: /bin/bash
