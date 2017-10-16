@@ -20,6 +20,16 @@
         Ensure the easy-rsa package is installed or disable the `openvpn_use_system_easyrsa` option.
     when: openvpn_use_system_easyrsa and not openvpn_easyrsa_check.stat.exists
 
+  - set_fact:
+      openvpn_easyrsa_dir: >-
+        {{ '/usr/share/easy-rsa' if openvpn_use_system_easyrsa else openvpn_etcdir + '/easy-rsa' }}
+
+  - name: Copy OpenSSL CNF to OpenVPN dir
+    copy:
+      src: "{{ openvpn_easyrsa_dir }}/openssl-1.0.0.cnf"
+      dest: "{{ openvpn_etcdir }}/openssl.cnf"
+      remote_src: yes
+
   - name: Generate vars file
     template:
       src: vars.j2
@@ -97,16 +107,20 @@
     notify: openvpn restart
 
   - name: Revoke Clients keys
-    shell: >
-      [[ -f crl.pem && -f "{{ item }}.crt" ]] || exit 20;
-      openssl verify -CAfile <(cat ca.crt crl.pem) -crl_check "{{ item }}.crt" | grep revoked && exit 20;
+    shell: |
+      if ! [[ -f crl.pem && -f "{{ item }}.crt" ]]; then
+        exit 20
+      fi
+      if openssl verify -CAfile <(cat ca.crt crl.pem) -crl_check "{{ item }}.crt" 2>&1 | grep revoked; then
+        exit 20
+      fi
       . "{{ openvpn_etcdir }}/vars" && "$EASY_RSA/revoke-full" "{{ item }}"
     args:
       executable: /bin/bash
       chdir: "{{ openvpn_keydir }}"
     register: openvpn_revoke_cmd
-    failed_when: openvpn_revoke_cmd.rc != 20 and 'revoked' not in openvpn_revoke_cmd.stdout
-    changed_when: openvpn_revoke_cmd.rc != 20
+    failed_when: openvpn_revoke_cmd.rc not in (0, 20)
+    changed_when: openvpn_revoke_cmd.rc == 0
     with_items: "{{ openvpn_clients_revoke }}"
 
   - name: Clear revocation leftovers
