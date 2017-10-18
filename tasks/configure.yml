@@ -107,14 +107,20 @@
     notify: openvpn restart
 
   - name: Revoke Clients keys
-    shell: |
+    shell: >-
       if ! [[ -f crl.pem && -f "{{ item }}.crt" ]]; then
-        exit 20
-      fi
+        exit 20;
+      fi;
       if openssl verify -CAfile <(cat ca.crt crl.pem) -crl_check "{{ item }}.crt" 2>&1 | grep revoked; then
-        exit 20
-      fi
-      . "{{ openvpn_etcdir }}/vars" && "$EASY_RSA/revoke-full" "{{ item }}"
+        exit 20;
+      fi;
+      . "{{ openvpn_etcdir }}/vars || exit 1;
+      "$EASY_RSA/revoke-full" "{{ item }}";
+      ret=$?;
+      if [ $ret -eq 2 ]; then
+        ret=0;
+      fi;
+      exit $ret
     args:
       executable: /bin/bash
       chdir: "{{ openvpn_keydir }}"
