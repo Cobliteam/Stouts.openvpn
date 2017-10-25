@@ -114,7 +114,7 @@
       if openssl verify -CAfile <(cat ca.crt crl.pem) -crl_check "{{ item }}.crt" 2>&1 | grep revoked; then
         exit 20;
       fi;
-      . "{{ openvpn_etcdir }}/vars || exit 1;
+      . "{{ openvpn_etcdir }}/vars" || exit 1;
       "$EASY_RSA/revoke-full" "{{ item }}";
       ret=$?;
       if [ $ret -eq 2 ]; then
